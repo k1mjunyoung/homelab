@@ -1,0 +1,4 @@
+*.pem
+*.un~
+gateway/certbot/conf/*
+.env

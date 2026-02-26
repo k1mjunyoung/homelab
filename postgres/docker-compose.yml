@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  db:
+    image: mariadb:10.5
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: your_root_password
+      MYSQL_DATABASE: writefreely
+      MYSQL_USER: wf_user
+      MYSQL_PASSWORD: wf_password
+    volumes:
+      - ./db_data:/var/lib/mysql
+
+  web:
+    image: writeas/writefreely
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/config
+      - ./data:/data
+      - ./keys:/keys
+    depends_on:
+      - db

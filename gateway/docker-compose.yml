@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    networks:
+      - ger-net
+    environment:
+      - TZ=Asia/Seoul
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    networks:
+      - ger-net
+    entrypoint: "/bin/sh -c 'while true; do sleep 12h && certbot renew; done'"
+    environment:
+      - TZ=Asia/Seoul
+
+  cloudflare-ddns:
+    build: ./ddns
+    container_name: cloudflare-ddns
+    restart: unless-stopped
+    networks:
+      - ger-net
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Seoul
+
+networks:
+  ger-net:
+    external: true

@@ -1,0 +1,26 @@
+version: "3"
+
+services:
+  gitea:
+    image: docker.gitea.com/gitea:1.23.8
+    container_name: gitea
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+    restart: unless-stopped
+    networks:
+      - ger-net
+    volumes:
+      - gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3001:3000"
+      - "2201:22"
+
+volumes:
+  gitea:
+
+networks:
+  ger-net:
+    external: true
