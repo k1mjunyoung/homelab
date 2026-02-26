@@ -9,7 +9,7 @@ services:
       - USER_GID=1000
     restart: unless-stopped
     networks:
-      - ger-net
+      - jigu-net
     volumes:
       - gitea:/data
       - /etc/timezone:/etc/timezone:ro
@@ -22,5 +22,5 @@ volumes:
   gitea:
 
 networks:
-  ger-net:
+  jigu-net:
     external: true

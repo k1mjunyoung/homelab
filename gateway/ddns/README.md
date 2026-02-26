@@ -64,7 +64,7 @@ CF_RECORDS=your-domain.com|false,git.your-domain.com|true
 
 ```bash
 # 외부 네트워크가 없다면 먼저 생성
-docker network create ger-net
+docker network create jigu-net
 
 cd gateway
 docker compose up -d cloudflare-ddns

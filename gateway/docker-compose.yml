@@ -13,7 +13,7 @@ services:
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
     networks:
-      - ger-net
+      - jigu-net
     environment:
       - TZ=Asia/Seoul
 
@@ -24,7 +24,7 @@ services:
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
     networks:
-      - ger-net
+      - jigu-net
     entrypoint: "/bin/sh -c 'while true; do sleep 12h && certbot renew; done'"
     environment:
       - TZ=Asia/Seoul
@@ -34,12 +34,12 @@ services:
     container_name: cloudflare-ddns
     restart: unless-stopped
     networks:
-      - ger-net
+      - jigu-net
     env_file:
       - .env
     environment:
       - TZ=Asia/Seoul
 
 networks:
-  ger-net:
+  jigu-net:
     external: true
