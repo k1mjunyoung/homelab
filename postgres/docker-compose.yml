@@ -250,6 +250,7 @@ volumes:
 # 네트워크
 # ──────────────────────────────────────────────────
 networks:
-  jigu_net:
+  jigu-net:
     # bridge: 단일 호스트 컨테이너 간 통신 (기본값)
-    driver: bridge
+    # driver: bridge
+    external: true
