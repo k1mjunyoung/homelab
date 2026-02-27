@@ -1,25 +1,255 @@
-version: '3'
+# PostgreSQL Docker Compose 설정
+# 참고: https://hub.docker.com/_/postgres
+# 참고: https://www.postgresql.org/docs/current/
 
 services:
-  db:
-    image: mariadb:10.5
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: your_root_password
-      MYSQL_DATABASE: writefreely
-      MYSQL_USER: wf_user
-      MYSQL_PASSWORD: wf_password
-    volumes:
-      - ./db_data:/var/lib/mysql
+  postgres:
+    # ──────────────────────────────────────────────
+    # 이미지
+    # ──────────────────────────────────────────────
+    # 태그 형식: <버전>[-alpine]
+    # - alpine 변형은 경량 이미지 (Alpine Linux 기반)
+    # - 기본 이미지는 Debian 기반
+    # 지원 버전: 14, 15, 16, 17, 18
+    image: postgres:18-alpine
 
-  web:
-    image: writeas/writefreely
-    restart: always
+    container_name: postgres
+
+    # ──────────────────────────────────────────────
+    # 재시작 정책
+    # ──────────────────────────────────────────────
+    # no          : 재시작 안 함 (기본값)
+    # always      : 항상 재시작
+    # on-failure  : 비정상 종료 시에만 재시작
+    # unless-stopped: 수동으로 중지하지 않는 한 항상 재시작
+    restart: unless-stopped
+
+    # ──────────────────────────────────────────────
+    # 환경 변수
+    # ──────────────────────────────────────────────
+    environment:
+      # [필수] superuser 패스워드
+      # - 반드시 설정해야 함 (빈 값 불가)
+      # - _FILE 접미사로 Docker Secret 파일 경로 지정 가능
+      #   예) POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+
+      # [선택] superuser 계정 이름
+      # - 기본값: postgres
+      # - 지정 시 해당 이름의 superuser 및 동일 이름의 DB 생성
+      # - _FILE 접미사 지원
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+
+      # [선택] 초기 생성 데이터베이스 이름
+      # - 기본값: POSTGRES_USER 값과 동일
+      # - _FILE 접미사 지원
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+
+      # [선택] initdb 추가 인자
+      # - pg_basebackup 등 초기화 시 전달할 옵션
+      # - 기본값: (없음)
+      # - 예) --data-checksums : 페이지 체크섬 활성화
+      # - 예) --encoding=UTF8 --locale=ko_KR.UTF-8
+      # - _FILE 접미사 지원
+      # POSTGRES_INITDB_ARGS: "--data-checksums"
+
+      # [선택] WAL(트랜잭션 로그) 저장 디렉토리
+      # - 데이터 디렉토리와 별도의 위치에 WAL 저장
+      # - 기본값: PGDATA 내부 (pg_wal 서브디렉토리)
+      # - PostgreSQL 9.x 이하: POSTGRES_INITDB_XLOGDIR 사용
+      # POSTGRES_INITDB_WALDIR: /var/lib/postgresql/wal
+
+      # [선택] 호스트 연결 인증 방식
+      # - pg_hba.conf 의 host 행에 적용되는 auth-method
+      # - 기본값: scram-sha-256 (PostgreSQL 14+), md5 (구버전)
+      # - 주의: trust 설정 시 패스워드 없이 접속 가능 (보안 위험)
+      # 선택지: trust, md5, scram-sha-256, peer, ident, reject 등
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+
+      # [선택] 데이터 저장 디렉토리
+      # ★ PG18 변경점: 기본값이 버전별 경로로 변경됨
+      # - PostgreSQL 17 이하: /var/lib/postgresql/data
+      # - PostgreSQL 18 이상: /var/lib/postgresql/18/docker  ← 새 기본값
+      # - 볼륨 마운트 포인트도 /var/lib/postgresql 로 변경됨 (아래 volumes 참고)
+      PGDATA: /var/lib/postgresql/18/docker
+
+      # [선택] 로케일 설정 (DB 초기화 시 적용)
+      # - 기본값: 시스템 로케일 (보통 en_US.utf8)
+      # - alpine 이미지는 기본적으로 C.UTF-8 사용
+      # LANG: ko_KR.utf8
+
+      # [선택] 타임존
+      # - 기본값: UTC
+      # TZ: Asia/Seoul
+
+    # ──────────────────────────────────────────────
+    # 포트 매핑
+    # ──────────────────────────────────────────────
+    # 형식: "<호스트포트>:<컨테이너포트>"
+    # - PostgreSQL 기본 포트: 5432
+    # - 외부 노출이 필요 없으면 이 항목을 제거하고
+    #   같은 Docker 네트워크 내 서비스끼리만 통신 권장
     ports:
-      - "8080:8080"
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    # ──────────────────────────────────────────────
+    # 볼륨 마운트
+    # ──────────────────────────────────────────────
     volumes:
-      - ./config:/config
-      - ./data:/data
-      - ./keys:/keys
-    depends_on:
-      - db
+      # 데이터 영속성
+      # ★ PG18 변경점: VOLUME 선언이 /var/lib/postgresql 로 변경됨
+      # - PG17 이하: /var/lib/postgresql/data 에 마운트
+      # - PG18 이상: /var/lib/postgresql 에 마운트 (PGDATA 상위 디렉토리)
+      #   → 마운트 위치가 /var/lib/postgresql 이어야 PGDATA 경로 전체가 영속화됨
+      - postgres_data:/var/lib/postgresql
+
+      # 초기화 스크립트 디렉토리
+      # - 컨테이너 최초 기동 시 (데이터 디렉토리가 비어 있을 때만) 실행
+      # - 실행 순서: 파일명 오름차순(locale sort)
+      # - 지원 형식:
+      #     *.sql      → POSTGRES_USER 권한으로 POSTGRES_DB에 실행
+      #     *.sql.gz   → 압축 SQL 파일 자동 해제 후 실행
+      #     *.sh       → 실행 권한 있으면 직접 실행, 없으면 source
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+
+      # PostgreSQL 설정 파일 오버라이드 (선택)
+      # - /usr/share/postgresql/postgresql.conf.sample 참고
+      # - 컨테이너 기동 시 -c 옵션으로도 설정 가능 (command 항목 참고)
+      # - ./postgresql.conf:/etc/postgresql/postgresql.conf
+
+      # pg_hba.conf 오버라이드 (선택)
+      # - POSTGRES_HOST_AUTH_METHOD 보다 세밀한 접근 제어 필요 시
+      # - ./pg_hba.conf:/etc/postgresql/pg_hba.conf
+
+    # ──────────────────────────────────────────────
+    # 커맨드 (PostgreSQL 서버 기동 옵션)
+    # ──────────────────────────────────────────────
+    # -c 플래그로 postgresql.conf 파라미터를 직접 지정
+    # 파일 마운트 대신 소수의 파라미터 조정 시 유용
+    #
+    # ★ PG18 신규: io_method — 비동기 I/O 방식
+    #   PostgreSQL 18부터 AIO(Asynchronous I/O)가 도입되어 읽기 성능 2~3배 향상 가능
+    #
+    #   선택지:
+    #   - worker (기본값): 전용 백그라운드 프로세스가 I/O를 대신 처리
+    #                      모든 OS/커널에서 동작, PG18 기본값
+    #   - io_uring       : Linux io_uring 인터페이스 사용 (커널 5.1+ 필요)
+    #                      공유 링버퍼로 syscall 오버헤드 최소화, 가장 빠름
+    #                      ※ 공식 Docker 이미지는 io_uring 미지원 (컴파일 제외)
+    #                        → 설정해도 "invalid value" 에러 발생
+    #   - sync           : 동기 I/O (PG17 이전 방식), 성능 비교/문제 해결용
+    #
+    # ★ PG18 신규: uuidv7() 함수
+    #   별도 설정 불필요 — PG18 빌트인 함수로 즉시 사용 가능
+    #   SQL에서 직접 호출:
+    #     SELECT uuidv7();
+    #     CREATE TABLE t (id UUID PRIMARY KEY DEFAULT uuidv7(), ...);
+    #   서브밀리초 타임스탬프 포함으로 시간순 정렬 가능 (B-Tree 인덱스 효율 향상)
+    #
+    command: >
+      postgres
+      -c io_method=worker
+      -c shared_buffers=256MB
+      -c max_connections=200
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c effective_cache_size=768MB
+      -c wal_level=replica
+      -c log_statement=none
+      -c log_min_duration_statement=1000
+
+    # ──────────────────────────────────────────────
+    # 헬스체크
+    # ──────────────────────────────────────────────
+    # pg_isready: PostgreSQL 서버가 연결을 받을 준비가 됐는지 확인
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}"]
+      # 헬스체크 시작 전 대기 시간 (기본값: 0s)
+      start_period: 10s
+      # 헬스체크 실행 간격 (기본값: 30s)
+      interval: 30s
+      # 헬스체크 타임아웃 (기본값: 30s)
+      timeout: 10s
+      # 실패 허용 횟수 초과 시 unhealthy 판정 (기본값: 3)
+      retries: 5
+
+    # ──────────────────────────────────────────────
+    # 리소스 제한
+    # ──────────────────────────────────────────────
+    deploy:
+      resources:
+        limits:
+          # CPU 최대 사용량 (1.0 = 1코어)
+          # 기본값: 제한 없음
+          cpus: "2.0"
+          # 메모리 최대 사용량
+          # 기본값: 제한 없음
+          memory: 2G
+        reservations:
+          # CPU 예약량 (스케줄러 힌트)
+          cpus: "0.5"
+          # 메모리 예약량 (스케줄러 힌트)
+          memory: 512M
+
+    # ──────────────────────────────────────────────
+    # 보안 옵션
+    # ──────────────────────────────────────────────
+    security_opt:
+      # seccomp 프로파일 비활성화
+      # 기본값: Docker 기본 seccomp 프로파일 적용
+      # - no-new-privileges: 컨테이너 내 권한 상승 차단
+      - no-new-privileges:true
+
+    # ──────────────────────────────────────────────
+    # 사용자 지정 (선택)
+    # ──────────────────────────────────────────────
+    # 기본값: postgres (uid:gid = 999:999, alpine 기준 70:70)
+    # 임의 uid로 실행 시 해당 uid가 /etc/passwd 에 존재해야 함
+    # user: "999:999"
+
+    # ──────────────────────────────────────────────
+    # 로깅
+    # ──────────────────────────────────────────────
+    logging:
+      # json-file: 로컬 JSON 형식 (기본값)
+      # syslog, journald, fluentd, awslogs, gelf 등 선택 가능
+      driver: json-file
+      options:
+        # 단일 로그 파일 최대 크기 (기본값: -1, 무제한)
+        max-size: "10m"
+        # 보관할 로그 파일 수 (기본값: 1)
+        max-file: "5"
+
+    # ──────────────────────────────────────────────
+    # 네트워크
+    # ──────────────────────────────────────────────
+    networks:
+      - jigu-net
+
+    # ──────────────────────────────────────────────
+    # shm_size (공유 메모리)
+    # ──────────────────────────────────────────────
+    # PostgreSQL은 공유 메모리를 많이 사용
+    # Docker 기본값: 64m — 부족 시 "could not resize shared memory" 에러 발생
+    # shared_buffers 설정값의 2배 이상 권장
+    shm_size: 512m
+
+# ──────────────────────────────────────────────────
+# Named Volumes
+# ──────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    # driver: local (기본값)
+    # 호스트 바인드 마운트로 변경하려면 아래 주석 해제
+    # driver_opts:
+    #   type: none
+    #   o: bind
+    #   device: /data/postgres
+
+# ──────────────────────────────────────────────────
+# 네트워크
+# ──────────────────────────────────────────────────
+networks:
+  jigu_net:
+    # bridge: 단일 호스트 컨테이너 간 통신 (기본값)
+    driver: bridge
