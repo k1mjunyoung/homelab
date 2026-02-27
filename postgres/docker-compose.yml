@@ -32,7 +32,7 @@ services:
       # - 반드시 설정해야 함 (빈 값 불가)
       # - _FILE 접미사로 Docker Secret 파일 경로 지정 가능
       #   예) POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
 
       # [선택] superuser 계정 이름
       # - 기본값: postgres
