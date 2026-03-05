@@ -2,7 +2,6 @@
 *.un~
 gateway/certbot/conf/*
 .env
-.claude/
 
 # Supabase
 supabase/volumes/db/data/
